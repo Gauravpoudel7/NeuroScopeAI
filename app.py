@@ -1,8 +1,15 @@
 import streamlit as st
-import time
-from agents import build_reader_agent, build_search_agent, writer_chain, critic_chain
 
-# ── PAGE CONFIG ─────────────────────────────────────────────
+from agents import (
+    build_reader_agent,
+    build_search_agent,
+    writer_chain,
+    critic_chain,
+)
+
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
 st.set_page_config(
     page_title="NeuroScope AI",
     page_icon="🧠",
@@ -10,162 +17,369 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── NEW MODERN UI THEME ─────────────────────────────────────
+# ─────────────────────────────────────────────
+# STYLING
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-    color: #e8f0ff;
-}
-
-/* Background */
+/* =========================
+   GLOBAL BACKGROUND
+========================= */
 .stApp {
-    background: radial-gradient(circle at 20% 10%, #0f1b2d, #05070d);
+    background: radial-gradient(circle at 20% 10%, #0b1220, #05070d);
+    font-family: 'Inter', sans-serif;
 }
 
-/* Hide Streamlit UI */
-#MainMenu, footer, header { visibility: hidden; }
+/* Floating neon blobs */
+.stApp::before,
+.stApp::after {
+    content: "";
+    position: fixed;
+    width: 450px;
+    height: 450px;
+    border-radius: 50%;
+    filter: blur(140px);
+    opacity: 0.35;
+    z-index: -1;
+    animation: float 14s infinite ease-in-out;
+}
 
-/* ── HERO ── */
+.stApp::before {
+    background: #00e5ff;
+    top: 10%;
+    left: -10%;
+}
+
+.stApp::after {
+    background: #7c4dff;
+    bottom: 10%;
+    right: -10%;
+    animation-delay: 6s;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(40px) scale(1.1); }
+    100% { transform: translateY(0px) scale(1); }
+}
+
+/* =========================
+   HERO
+========================= */
 .hero {
     text-align: center;
-    padding: 3rem 0 2rem;
+    padding: 3rem 1rem 1.5rem;
 }
 
 .hero h1 {
-    font-size: 3.5rem;
-    font-weight: 700;
-    letter-spacing: -1px;
+    font-size: 4rem;
+    font-weight: 800;
+    letter-spacing: -2px;
 }
 
 .hero h1 span {
-    color: #00e5ff;
+    background: linear-gradient(90deg, #00e5ff, #7c4dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .hero p {
-    color: #9fb3c8;
-    max-width: 600px;
+    color: #a9b8d1;
+    max-width: 700px;
     margin: auto;
+    font-size: 1.05rem;
 }
 
-/* ── INPUT CARD ── */
+/* =========================
+   CARD (GLASSMORPHISM)
+========================= */
 .card {
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px;
+    border-radius: 18px;
     padding: 1.5rem;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
 }
 
-/* INPUT */
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+}
+
+/* =========================
+   INPUT
+========================= */
 .stTextInput input {
-    background: rgba(255,255,255,0.05) !important;
-    border-radius: 10px !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 12px !important;
     color: white !important;
+    padding: 12px !important;
 }
 
-/* BUTTON */
+/* =========================
+   BUTTON
+========================= */
 .stButton button {
-    background: linear-gradient(90deg, #00e5ff, #7c4dff);
-    color: #000;
+    background: linear-gradient(135deg, #00e5ff, #7c4dff);
+    color: #0b0f1a;
     font-weight: 700;
-    border-radius: 10px;
-    width: 100%;
-}
-
-/* PIPELINE */
-.step {
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.6rem;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.08);
-}
-.step.done { border-color: #00e5ff; }
-.step.active { border-color: #7c4dff; }
-
-/* RESULT BOX */
-.result {
-    background: rgba(255,255,255,0.03);
-    padding: 1.5rem;
     border-radius: 12px;
+    width: 100%;
+    padding: 0.7rem;
+    border: none;
+    box-shadow: 0 10px 30px rgba(124,77,255,0.25);
+    transition: all 0.2s ease;
 }
+
+.stButton button:hover {
+    transform: scale(1.03);
+    box-shadow: 0 15px 40px rgba(0,229,255,0.25);
+}
+
+/* =========================
+   PIPELINE STEPS
+========================= */
+.step {
+    padding: 1rem;
+    margin-bottom: 0.6rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.2s ease;
+}
+
+.step.done {
+    border-color: #00e5ff;
+    background: rgba(0,229,255,0.08);
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+}
+
+.step:hover {
+    transform: translateX(5px);
+}
+
+/* =========================
+   OUTPUT BOX
+========================= */
+.result {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 1.8rem;
+    border-radius: 18px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# ── HERO ─────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# HERO
+# ─────────────────────────────────────────────
 st.markdown("""
 <div class="hero">
     <h1>Neuro<span>Scope</span> AI</h1>
-    <p>Multi-agent intelligence system that researches, analyzes, and generates structured knowledge reports.</p>
+    <p>
+        Enterprise-grade multi-agent intelligence system for autonomous research, reasoning, and structured report generation.
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
-# ── LAYOUT ───────────────────────────────────────────────────
-col1, col2 = st.columns([5, 4])
+# ─────────────────────────────────────────────
+# LAYOUT
+# ─────────────────────────────────────────────
+left, right = st.columns([5, 4])
 
-with col1:
+with left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    topic = st.text_input("Enter Research Topic")
+    topic = st.text_input(
+        "Enter Research Topic",
+        placeholder="Example: Future of Generative AI"
+    )
+
     run_btn = st.button("Run Intelligence Pipeline")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-with col2:
+with right:
+
     st.markdown("### Agent Pipeline")
 
-    r = st.session_state.get("results", {})
+    results = st.session_state.get("results", {})
 
-    def step(name):
-        if name in r:
-            st.markdown(f'<div class="step done">{name} ✔</div>', unsafe_allow_html=True)
+    def pipeline_step(label, key):
+        if key in results:
+            st.markdown(
+                f'<div class="step done">{label} ✔</div>',
+                unsafe_allow_html=True
+            )
         else:
-            st.markdown(f'<div class="step">{name}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="step">{label}</div>',
+                unsafe_allow_html=True
+            )
 
-    step("Search Agent")
-    step("Reader Agent")
-    step("Writer Agent")
-    step("Critic Agent")
+    pipeline_step("Search Agent", "search")
+    pipeline_step("Reader Agent", "reader")
+    pipeline_step("Writer Agent", "writer")
+    pipeline_step("Critic Agent", "critic")
 
-# ── RUN PIPELINE ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# RUN PIPELINE
+# ─────────────────────────────────────────────
 if run_btn and topic:
+
     st.session_state.results = {}
 
-    with st.spinner("Searching knowledge base..."):
-        search_agent = build_search_agent()
-        sr = search_agent.invoke({
-            "messages": [("user", topic)]
-        })
-        st.session_state.results["search"] = sr["messages"][-1].content
+    # SEARCH
+    try:
 
-    with st.spinner("Reading sources..."):
-        reader_agent = build_reader_agent()
-        rr = reader_agent.invoke({
-            "messages": [("user", st.session_state.results["search"])]
-        })
-        st.session_state.results["reader"] = rr["messages"][-1].content
+        with st.spinner("🔍 Search Agent Working..."):
 
-    with st.spinner("Writing report..."):
-        st.session_state.results["writer"] = writer_chain.invoke({
-            "topic": topic,
-            "research": str(st.session_state.results)
-        })
+            search_agent = build_search_agent()
 
-    with st.spinner("Critiquing output..."):
-        st.session_state.results["critic"] = critic_chain.invoke({
-            "report": st.session_state.results["writer"]
-        })
+            search_response = search_agent.invoke(
+                {
+                    "messages": [
+                        (
+                            "user",
+                            topic
+                        )
+                    ]
+                }
+            )
 
-# ── OUTPUT ───────────────────────────────────────────────────
-r = st.session_state.get("results", {})
+            st.session_state.results["search"] = (
+                search_response["messages"][-1].content
+            )
 
-if "writer" in r:
-    st.markdown("## Final Report")
-    st.markdown(f'<div class="result">{r["writer"]}</div>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Search Agent Error:\n{e}")
 
-if "critic" in r:
-    st.markdown("## Critic Feedback")
-    st.markdown(f'<div class="result">{r["critic"]}</div>', unsafe_allow_html=True)
+    # READER
+    try:
+
+        with st.spinner("📚 Reader Agent Working..."):
+
+            reader_agent = build_reader_agent()
+
+            reader_response = reader_agent.invoke(
+                {
+                    "messages": [
+                        (
+                            "user",
+                            f"""
+Analyze and summarize the following research:
+
+{st.session_state.results.get('search', '')}
+"""
+                        )
+                    ]
+                }
+            )
+
+            st.session_state.results["reader"] = (
+                reader_response["messages"][-1].content
+            )
+
+    except Exception as e:
+        st.error(f"Reader Agent Error:\n{e}")
+
+    # WRITER
+    try:
+
+        with st.spinner("✍️ Writing Report..."):
+
+            research_text = f"""
+SEARCH RESULTS:
+
+{st.session_state.results.get('search', '')}
+
+READER ANALYSIS:
+
+{st.session_state.results.get('reader', '')}
+"""
+
+            report = writer_chain.invoke(
+                {
+                    "topic": topic,
+                    "research": research_text,
+                }
+            )
+
+            st.session_state.results["writer"] = report
+
+    except Exception as e:
+        st.error(f"Writer Error:\n{e}")
+
+    # CRITIC
+    try:
+
+        with st.spinner("🧐 Critiquing Report..."):
+
+            critique = critic_chain.invoke(
+                {
+                    "report": st.session_state.results.get(
+                        "writer",
+                        ""
+                    )
+                }
+            )
+
+            st.session_state.results["critic"] = critique
+
+    except Exception as e:
+        st.error(f"Critic Error:\n{e}")
+
+# ─────────────────────────────────────────────
+# OUTPUT
+# ─────────────────────────────────────────────
+results = st.session_state.get("results", {})
+
+if "writer" in results:
+
+    st.markdown("## 📄 Final Research Report")
+
+    st.markdown(
+        f"""
+<div class="result">
+{results['writer']}
+</div>
+""",
+        unsafe_allow_html=True
+    )
+
+if "critic" in results:
+
+    st.markdown("## 🧐 Critic Feedback")
+
+    st.markdown(
+        f"""
+<div class="result">
+{results['critic']}
+</div>
+""",
+        unsafe_allow_html=True
+    )
+
+# ─────────────────────────────────────────────
+# DEBUG SECTION
+# ─────────────────────────────────────────────
+if results:
+
+    with st.expander("Search Agent Output"):
+        st.write(results.get("search", ""))
+
+    with st.expander("Reader Agent Output"):
+        st.write(results.get("reader", ""))

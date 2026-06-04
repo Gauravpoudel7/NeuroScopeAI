@@ -1,75 +1,132 @@
-from agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
+from dotenv import load_dotenv
 
-def run_research_pipeline(topic : str) -> dict:
+from langchain.agents import create_agent
 
-    state = {}
+from langchain_huggingface import (
+    HuggingFaceEndpoint,
+    ChatHuggingFace
+)
 
-    #search agent working 
-    print("\n"+" ="*50)
-    print("step 1 - search agent is working ...")
-    print("="*50)
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 
-    search_agent = build_search_agent()
-    search_result = search_agent.invoke({
-        "messages" : [("user", f"Find recent, reliable and detailed information about: {topic}")]
-    })
-    state["search_results"] = search_result['messages'][-1].content
+from tools import web_search, scrape_url
 
-    print("\n search result ",state['search_results'])
+# =========================
+# LOAD ENV VARIABLES
+# =========================
+load_dotenv()
 
-    #step 2 - reader agent 
-    print("\n"+" ="*50)
-    print("step 2 - Reader agent is scraping top resources ...")
-    print("="*50)
+# =========================
+# HUGGING FACE LLM
+# =========================
+hf_llm = HuggingFaceEndpoint(
+    repo_id="Qwen/Qwen2.5-7B-Instruct",
+    task="text-generation",
+    temperature=0,
+    max_new_tokens=2048,
+)
 
-    reader_agent = build_reader_agent()
-    reader_result = reader_agent.invoke({
-        "messages": [("user",
-            f"Based on the following search results about '{topic}', "
-            f"pick the most relevant URL and scrape it for deeper content.\n\n"
-            f"Search Results:\n{state['search_results'][:800]}"
-        )]
-    })
+llm = ChatHuggingFace(llm=hf_llm)
 
-    state['scraped_content'] = reader_result['messages'][-1].content
-
-    print("\nscraped content: \n", state['scraped_content'])
-
-    #step 3 - writer chain 
-
-    print("\n"+" ="*50)
-    print("step 3 - Writer is drafting the report ...")
-    print("="*50)
-
-    research_combined = (
-        f"SEARCH RESULTS : \n {state['search_results']} \n\n"
-        f"DETAILED SCRAPED CONTENT : \n {state['scraped_content']}"
+# =========================
+# SEARCH AGENT
+# =========================
+def build_search_agent():
+    return create_agent(
+        model=llm,
+        tools=[web_search]
     )
 
-    state["report"] = writer_chain.invoke({
-        "topic" : topic,
-        "research" : research_combined
-    })
+# =========================
+# READER AGENT
+# =========================
+def build_reader_agent():
+    return create_agent(
+        model=llm,
+        tools=[scrape_url]
+    )
 
-    print("\n Final Report\n",state['report'])
+# =========================
+# WRITER CHAIN
+# =========================
+writer_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are an expert research writer. Write clear, structured and insightful reports."
+        ),
+        (
+            "human",
+            """
+Write a detailed research report on the topic below.
 
-    #critic report 
+Topic:
+{topic}
 
-    print("\n"+" ="*50)
-    print("step 4 - critic is reviewing the report ")
-    print("="*50)
+Research Gathered:
+{research}
 
-    state["feedback"] = critic_chain.invoke({
-        "report":state['report']
-    })
+Structure the report as:
 
-    print("\n critic report \n", state['feedback'])
+- Introduction
+- Key Findings (minimum 3 well-explained points)
+- Conclusion
+- Sources (list all URLs found in the research)
 
-    return state
+Be detailed, factual and professional.
+"""
+        ),
+    ]
+)
 
+writer_chain = writer_prompt | llm | StrOutputParser()
 
+# =========================
+# CRITIC CHAIN
+# =========================
+critic_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are a sharp and constructive research critic. Be honest and specific."
+        ),
+        (
+            "human",
+            """
+Review the research report below and evaluate it strictly.
 
+Report:
+{report}
+
+Respond in this exact format:
+
+Score: X/10
+
+Strengths:
+- ...
+- ...
+
+Areas to Improve:
+- ...
+- ...
+
+One line verdict:
+...
+"""
+        ),
+    ]
+)
+
+critic_chain = critic_prompt | llm | StrOutputParser()
+
+# =========================
+# TEST
+# =========================
 if __name__ == "__main__":
-    topic = input("\n Enter a research topic : ")
-    run_research_pipeline(topic)
 
+    response = llm.invoke(
+        "Explain Artificial Intelligence in 3 sentences."
+    )
+
+    print(response.content)

@@ -1,26 +1,30 @@
 from dotenv import load_dotenv
 
 from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from tools import web_search, scrape_url
 
-
-# Load environment variables
+# =========================
+# LOAD ENV
+# =========================
 load_dotenv()
 
-
 # =========================
-# MODEL SETUP (GEMINI)
+# HUGGING FACE MODEL
 # =========================
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    temperature=0
+hf_llm = HuggingFaceEndpoint(
+    repo_id="Qwen/Qwen2.5-7B-Instruct",
+    task="text-generation",
+    temperature=0,
+    max_new_tokens=2048,
 )
 
+llm = ChatHuggingFace(llm=hf_llm)
 
 # =========================
 # SEARCH AGENT
@@ -31,7 +35,6 @@ def build_search_agent():
         tools=[web_search]
     )
 
-
 # =========================
 # READER AGENT
 # =========================
@@ -41,82 +44,30 @@ def build_reader_agent():
         tools=[scrape_url]
     )
 
-
 # =========================
-# WRITER CHAIN
+# WRITER
 # =========================
 writer_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        "You are an expert research writer. Write clear, structured and insightful reports."
-    ),
-
-    (
-        "human",
-        """Write a detailed research report on the topic below.
-
-Topic: {topic}
-
-Research Gathered:
-{research}
-
-Structure the report as:
-
-- Introduction
-- Key Findings (minimum 3 well-explained points)
-- Conclusion
-- Sources (list all URLs found in the research)
-
-Be detailed, factual and professional.
-"""
-    ),
+    ("system", "You are an expert research writer."),
+    ("human",
+     "Write a report on:\n{topic}\n\nResearch:\n{research}")
 ])
 
 writer_chain = writer_prompt | llm | StrOutputParser()
 
-
 # =========================
-# CRITIC CHAIN
+# CRITIC
 # =========================
 critic_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        "You are a sharp and constructive research critic. Be honest and specific."
-    ),
-
-    (
-        "human",
-        """Review the research report below and evaluate it strictly.
-
-Report:
-{report}
-
-Respond in this exact format:
-
-Score: X/10
-
-Strengths:
-- ...
-- ...
-
-Areas to Improve:
-- ...
-- ...
-
-One line verdict:
-...
-"""
-    ),
+    ("system", "You are a strict critic."),
+    ("human",
+     "Review this report:\n{report}")
 ])
 
 critic_chain = critic_prompt | llm | StrOutputParser()
-
 
 # =========================
 # TEST
 # =========================
 if __name__ == "__main__":
-
-    response = llm.invoke("Hello Gemini!")
-
-    print(response.content)
+    print(llm.invoke("Hello!").content)
