@@ -63,7 +63,7 @@ TAVILY_API_KEY=your_tavily_api_key
 
 Clone the repository:
 
-git clone https://github.com/your-username/neuroscope-ai.git
+git clone https://github.com/gauravpoudel7/neuroscope-ai.git
 cd neuroscope-ai
 
 Install dependencies:
